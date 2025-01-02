@@ -1,36 +1,43 @@
-from flask import Flask, request
+from flask import Flask
 import threading
 import telebot
 from yt_dlp import YoutubeDL
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
-import requests
 
+# إنشاء تطبيق Flask
 app = Flask('')
 
+# تعريف الصفحة الرئيسية
 @app.route('/')
 def home():
     return "Bot is running!"
 
+# تشغيل السيرفر
 def run():
     app.run(host='0.0.0.0', port=8080)
 
+# إبقاء السيرفر نشطًا
 def keep_alive():
     t = threading.Thread(target=run)
     t.start()
 
-API_TOKEN = "7042669036:AAEPuM5tdtd2U3fTybmg1vfnwr0p5XMET9Q"
+# استبدل بالتوكن الخاص بك
+API_TOKEN = "7042669036:AAGSiKCw1dpoLTqW9O3Z6WJ4vlLSXkbWIKY"
 bot = telebot.TeleBot(API_TOKEN)
 
+# رابط القناة
 channel_url = "https://t.me/Nillionaire_ar"
-bot_owner_id = 5592854910
+bot_owner_id = 5592854910  # استبدل برقم تعريفك كمستخدم
 
+# إحصائيات
 usage_stats = {
     'total_users': 0,
     'total_downloads': 0,
     'user_downloads': {}
 }
 
+# التحقق من الاشتراك في القناة
 def is_subscribed(user_id):
     if user_id == bot_owner_id:
         return True
@@ -40,6 +47,7 @@ def is_subscribed(user_id):
     except:
         return False
 
+# تحديث الإحصائيات
 def update_stats(user_id):
     usage_stats['total_downloads'] += 1
     if user_id in usage_stats['user_downloads']:
@@ -48,6 +56,7 @@ def update_stats(user_id):
         usage_stats['user_downloads'][user_id] = 1
         usage_stats['total_users'] += 1
 
+# تحديد نوع الرابط
 def detect_platform(url):
     if "youtube.com" in url or "youtu.be" in url:
         return "YouTube"
@@ -62,6 +71,7 @@ def detect_platform(url):
     else:
         return "Unknown"
 
+# رسالة الترحيب
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     if not is_subscribed(message.from_user.id):
@@ -86,6 +96,7 @@ def send_welcome(message):
         parse_mode="Markdown",
     )
 
+# إحصائيات الاستخدام
 @bot.message_handler(commands=['stats'])
 def send_stats(message):
     if message.from_user.id != bot_owner_id:
@@ -99,6 +110,7 @@ def send_stats(message):
     )
     bot.reply_to(message, stats_message, parse_mode="Markdown")
 
+# تنزيل الفيديوهات
 @bot.message_handler(func=lambda message: not message.text.startswith('/'))
 def download_video(message):
     if not is_subscribed(message.from_user.id):
@@ -114,6 +126,7 @@ def download_video(message):
 
     url = message.text.strip()
 
+    # التحقق من صحة الرابط
     if not url.startswith("http"):
         bot.reply_to(message, "🚫 الرجاء إرسال رابط فيديو صالح.")
         return
@@ -123,33 +136,33 @@ def download_video(message):
 
     try:
         ydl_opts = {
-            'outtmpl': 'video.mp4',
-            'quiet': True,
-            'no_warnings': True,
-            'format': 'best'
+            'outtmpl': 'video.mp4',  # تسمية الفيديو المؤقت
+            'quiet': True,           # تشغيل بصمت
+            'no_warnings': True,     # منع التحذيرات
+            'format': 'best'         # أفضل جودة متاحة
         }
 
         with YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(url, download=False)
-            video_size = info_dict.get('filesize', 0)
-            if video_size > 100 * 1024 * 1024:
+            video_size = info_dict.get('filesize', 0)  # حجم الفيديو بالبايت
+            if video_size > 100 * 1024 * 1024:  # 100 ميجابايت
                 bot.reply_to(message, "🚫 حجم الفيديو يتجاوز الحد المسموح به (100 ميجابايت).")
                 return
 
-            ydl.download([url])
+            ydl.download([url])  # تحميل الفيديو
 
+        # إرسال الفيديو
         with open("video.mp4", 'rb') as video:
             bot.send_video(message.chat.id, video)
             update_stats(message.from_user.id)
 
+        # حذف الملف بعد الإرسال
         os.remove("video.mp4")
     except Exception as e:
         bot.reply_to(message, f"❌ حدث خطأ أثناء التحميل: {e}")
 
-@app.route('/webhook_path', methods=['POST'])
-def webhook():
-    update = request.json
-    bot.process_new_updates([telebot.types.Update.de_json(update)])
-    return "OK", 200
-
+# استدعاء دالة خادم الويب
 keep_alive()
+
+# بدء تشغيل البوت
+bot.polling()

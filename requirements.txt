@@ -3,3 +3,5 @@ pytelegrambotapi
 yt-dlp==2024.12.23
 python-dotenv
 pytube
+sqlite3
+telebot

@@ -87,7 +87,7 @@ def is_subscribed(user_id):
     except:
         return False
 
-# تحميل الفيديو
+# تحميل الفيديو باستخدام الكوكيز
 def download_with_fallback(url):
     try:
         ydl_opts = {
@@ -95,6 +95,7 @@ def download_with_fallback(url):
             'quiet': True,
             'no_warnings': True,
             'format': 'best',
+            'cookiefile': 'cookies.txt',  # إضافة ملف الكوكيز هنا
         }
         with YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])

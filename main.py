@@ -2,8 +2,13 @@ from flask import Flask
 import threading
 import telebot
 from yt_dlp import YoutubeDL
+from pytube import YouTube  # مكتبة pytube
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
+from dotenv import load_dotenv  # مكتبة dotenv لتحميل المتغيرات البيئية
+
+# تحميل المتغيرات البيئية من ملف .env
+load_dotenv()
 
 # إنشاء تطبيق Flask
 app = Flask('')
@@ -22,8 +27,11 @@ def keep_alive():
     t = threading.Thread(target=run)
     t.start()
 
-# استبدل بالتوكن الخاص بك (من المتغيرات البيئية)
-API_TOKEN = os.getenv("TELEGRAM_API_TOKEN", "ضع_التوكن_هنا")  # استخدم متغير بيئي لحماية التوكن
+# الحصول على التوكن من ملف .env
+API_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
+if not API_TOKEN:
+    raise ValueError("❌ التوكن غير موجود في ملف .env. يرجى التحقق!")
+
 bot = telebot.TeleBot(API_TOKEN)
 
 # رابط القناة
@@ -47,30 +55,6 @@ def is_subscribed(user_id):
     except:
         return False
 
-# تحديث الإحصائيات
-def update_stats(user_id):
-    usage_stats['total_downloads'] += 1
-    if user_id in usage_stats['user_downloads']:
-        usage_stats['user_downloads'][user_id] += 1
-    else:
-        usage_stats['user_downloads'][user_id] = 1
-        usage_stats['total_users'] += 1
-
-# تحديد نوع الرابط
-def detect_platform(url):
-    if "youtube.com" in url or "youtu.be" in url:
-        return "YouTube"
-    elif "instagram.com" in url:
-        return "Instagram"
-    elif "facebook.com" in url:
-        return "Facebook"
-    elif "tiktok.com" in url:
-        return "TikTok"
-    elif "twitter.com" in url:
-        return "Twitter"
-    else:
-        return "Unknown"
-
 # تحميل الفيديو مع دعم مكتبات متعددة
 def download_with_fallback(url):
     try:
@@ -86,12 +70,11 @@ def download_with_fallback(url):
     except Exception as e:
         try:
             # المحاولة باستخدام pytube
-            from pytube import YouTube
             yt = YouTube(url)
             stream = yt.streams.get_highest_resolution()
             stream.download(filename="video.mp4")
         except Exception as fallback_error:
-            raise Exception(f"فشل التحميل باستخدام جميع المكتبات. الخطأ: {fallback_error}")
+            raise Exception(f"❌ فشل التحميل باستخدام جميع المكتبات. الخطأ: {fallback_error}")
 
 # رسالة الترحيب
 @bot.message_handler(commands=['start'])
@@ -118,20 +101,6 @@ def send_welcome(message):
         parse_mode="Markdown",
     )
 
-# إحصائيات الاستخدام
-@bot.message_handler(commands=['stats'])
-def send_stats(message):
-    if message.from_user.id != bot_owner_id:
-        bot.reply_to(message, "❌ ليس لديك صلاحية الوصول إلى هذه الأوامر.")
-        return
-
-    stats_message = (
-        f"📊 **إحصائيات الاستخدام:**\n"
-        f"👥 إجمالي عدد المستخدمين: {usage_stats['total_users']}\n"
-        f"📥 إجمالي عدد التنزيلات: {usage_stats['total_downloads']}\n"
-    )
-    bot.reply_to(message, stats_message, parse_mode="Markdown")
-
 # تنزيل الفيديوهات
 @bot.message_handler(func=lambda message: not message.text.startswith('/'))
 def download_video(message):
@@ -153,8 +122,7 @@ def download_video(message):
         bot.reply_to(message, "🚫 الرجاء إرسال رابط فيديو صالح.")
         return
 
-    platform = detect_platform(url)
-    bot.reply_to(message, f"⏳ جاري معالجة الفيديو من {platform}، يرجى الانتظار...")
+    bot.reply_to(message, "⏳ جاري معالجة الفيديو، يرجى الانتظار...")
 
     try:
         download_with_fallback(url)
@@ -162,7 +130,8 @@ def download_video(message):
         # إرسال الفيديو
         with open("video.mp4", 'rb') as video:
             bot.send_video(message.chat.id, video)
-            update_stats(message.from_user.id)
+            usage_stats['total_downloads'] += 1
+            usage_stats['user_downloads'][message.from_user.id] = usage_stats['user_downloads'].get(message.from_user.id, 0) + 1
 
         # حذف الملف بعد الإرسال
         os.remove("video.mp4")

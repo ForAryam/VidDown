@@ -63,7 +63,10 @@ def download_with_fallback(url):
             'outtmpl': 'video.mp4',
             'quiet': True,
             'no_warnings': True,
-            'format': 'best'
+            'format': 'best',
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
         }
         with YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
@@ -71,7 +74,7 @@ def download_with_fallback(url):
         try:
             # المحاولة باستخدام pytube
             yt = YouTube(url)
-            stream = yt.streams.get_highest_resolution()
+            stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
             stream.download(filename="video.mp4")
         except Exception as fallback_error:
             raise Exception(f"❌ فشل التحميل باستخدام جميع المكتبات. الخطأ: {fallback_error}")

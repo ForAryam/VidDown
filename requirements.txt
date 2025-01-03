@@ -1,5 +1,5 @@
 flask
 pytelegrambotapi
-yt-dlp
+yt-dlp>=2025.1.1
 python-dotenv
 pytube

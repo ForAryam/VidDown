@@ -22,8 +22,8 @@ def keep_alive():
     t = threading.Thread(target=run)
     t.start()
 
-# استبدل بالتوكن الخاص بك
-API_TOKEN = "7042669036:AAGSiKCw1dpoLTqW9O3Z6WJ4vlLSXkbWIKY"
+# استبدل بالتوكن الخاص بك (من المتغيرات البيئية)
+API_TOKEN = os.getenv("TELEGRAM_API_TOKEN", "ضع_التوكن_هنا")  # استخدم متغير بيئي لحماية التوكن
 bot = telebot.TeleBot(API_TOKEN)
 
 # رابط القناة
@@ -71,6 +71,28 @@ def detect_platform(url):
     else:
         return "Unknown"
 
+# تحميل الفيديو مع دعم مكتبات متعددة
+def download_with_fallback(url):
+    try:
+        # المحاولة باستخدام yt_dlp
+        ydl_opts = {
+            'outtmpl': 'video.mp4',
+            'quiet': True,
+            'no_warnings': True,
+            'format': 'best'
+        }
+        with YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+    except Exception as e:
+        try:
+            # المحاولة باستخدام pytube
+            from pytube import YouTube
+            yt = YouTube(url)
+            stream = yt.streams.get_highest_resolution()
+            stream.download(filename="video.mp4")
+        except Exception as fallback_error:
+            raise Exception(f"فشل التحميل باستخدام جميع المكتبات. الخطأ: {fallback_error}")
+
 # رسالة الترحيب
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -90,7 +112,7 @@ def send_welcome(message):
         (
             "🎉 مرحبًا بك!\n"
             "أنا بوت لتحميل الفيديوهات من المنصات التالية:\n"
-            "📌 **YouTube, Facebook, Instagram, Twitter **\n\n"
+            "📌 **YouTube, Facebook, Instagram, Twitter**\n\n"
             "🎥 أرسل الرابط وسأقوم بتحميل الفيديو لك!"
         ),
         parse_mode="Markdown",
@@ -135,21 +157,7 @@ def download_video(message):
     bot.reply_to(message, f"⏳ جاري معالجة الفيديو من {platform}، يرجى الانتظار...")
 
     try:
-        ydl_opts = {
-            'outtmpl': 'video.mp4',  # تسمية الفيديو المؤقت
-            'quiet': True,           # تشغيل بصمت
-            'no_warnings': True,     # منع التحذيرات
-            'format': 'best'         # أفضل جودة متاحة
-        }
-
-        with YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(url, download=False)
-            video_size = info_dict.get('filesize', 0)  # حجم الفيديو بالبايت
-            if video_size > 100 * 1024 * 1024:  # 100 ميجابايت
-                bot.reply_to(message, "🚫 حجم الفيديو يتجاوز الحد المسموح به (100 ميجابايت).")
-                return
-
-            ydl.download([url])  # تحميل الفيديو
+        download_with_fallback(url)
 
         # إرسال الفيديو
         with open("video.mp4", 'rb') as video:
